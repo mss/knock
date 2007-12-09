@@ -199,7 +199,7 @@ int main(int argc, char **argv)
 		strncpy(o_int, "eth0", sizeof(o_int));	/* no explicit termination needed */
 	}
 	if(o_usesyslog) {
-		openlog("knockd", 0, LOG_USER);
+		openlog("knockd", 0, LOG_DAEMON);
 	}
 	if(strlen(o_logfile)) {
 		/* open the log file */
