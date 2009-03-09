@@ -26,6 +26,7 @@
 #include <signal.h>
 #include <time.h>
 #include <ctype.h>
+#include <limits.h>
 #include <string.h>
 #include <fcntl.h>
 #if defined(__FreeBSD__) || defined(__APPLE__)
