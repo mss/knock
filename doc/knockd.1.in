@@ -173,10 +173,10 @@ Separate multiple flags with commas (eg, TCPFlags = syn,ack,urg).  Flags can be
 explicitly excluded by a "!" (eg, TCPFlags = syn,!ack).
 .TP
 .B "Start_Command = <command>"
-Specify the command to be executed when a client makes the correct
-port-knock.  All instances of \fB%IP%\fP will be replaced with the
-knocker's IP address.  The \fBCommand\fP directive is an alias for
-\fBStart_Command\fP.
+Specify the command to be executed when a client makes the correct port-knock.
+Some token (eg. \fB%IP%\fP) will be replaced with knock-specific values.  These
+are described under \fBCONFIGURATION: TOKEN\fP below.  The \fBCommand\fP
+directive is an alias for \fBStart_Command\fP.
 .TP
 .B "Cmd_Timeout = <timeout>"
 Time to wait (in seconds) between \fBStart_Command\fP and \fBStop_Command\fP.
@@ -184,8 +184,19 @@ This directive is optional, only required if \fBStop_Command\fP is used.
 .TP
 .B "Stop_Command = <command>"
 Specify the command to be executed when \fBCmd_Timeout\fP seconds have passed 
-since \fBStart_Command\fP has been executed.  All instances of \fB%IP%\fP will
-be replaced with the knocker's IP address.  This directive is optional.
+since \fBStart_Command\fP has been executed.The same token as in
+\fBStart_Command\fP are recognized.  This directive is optional.
+.SH CONFIGURATION: TOKEN
+The following token are recognized in the \fBStart_Command\fP and
+\fBStop_Command\fP directives:
+.TP
+.B "%IP%"
+The knocker's IP address.
+.TP
+.B "%TIME%"
+The UNIX timestamp.  Can be used to garbage-collect old rules via \fBcron\fP
+and the \fBcomment\fP module.  A wrapper script must then be used for a close
+rule since iptables needs the exact rule specification when removing rules.
 .SH SECURITY NOTES 
 Using the \fB-l\fP or \fB--lookup\fP commandline option to resolve DNS names
 for log entries may be a security risk!  An attacker may find out the first port

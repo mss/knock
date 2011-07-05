@@ -1168,6 +1168,20 @@ ssize_t parse_cmd(char* dest, size_t size, const char* cmd, const char* ip) {
 					}
 					total_len += ip_len;
 				}
+				/* paste the current system timestamp if this is the TIME token */
+				else if(memcmp(tok, "TIME", tok_len) == 0) {
+					/* 11 chars are enough for an unsigned int which should last until
+					 * year 2100 or so (time_t is probably 64 bit) */
+					char now[11];
+					int now_len;
+					now_len = sprintf(now, "%u", (unsigned)time(NULL));
+					if(size >= now_len) {
+						memcpy(dest, now, now_len);
+						dest += now_len;
+						size -= now_len;
+					}
+					total_len += now_len;
+				}
 				/* this must be an unknown token, bail out (will keep the) token 
 				 * pointer so the check below will make us return -1 */
 				else {
