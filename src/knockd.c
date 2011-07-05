@@ -1182,6 +1182,31 @@ ssize_t parse_cmd(char* dest, size_t size, const char* cmd, const knocker_t* kno
 					}
 					total_len += now_len;
 				}
+				/* paste the door's name if this is the NAME token */
+				else if(memcmp(tok, "NAME", tok_len) == 0) {
+					const char *name = knocker->door->name;
+					int name_len = strlen(name);
+					if(size >= name_len) {
+						memcpy(dest, name, name_len);
+						dest += name_len;
+						size -= name_len;
+					}
+					total_len += name_len;
+				}
+				/* paste the hostname, if available and this is the HOST token */
+				else if(memcmp(tok, "HOST", tok_len) == 0) {
+					const char *host = knocker->srchost;
+					int host_len = 0;
+					if(host) {
+						host_len = strlen(host);
+					}
+					if(size >= host_len) {
+						memcpy(dest, host, host_len);
+						dest += host_len;
+						size -= host_len;
+					}
+					total_len += host_len;
+				}
 				/* this must be an unknown token, bail out (will keep the) token 
 				 * pointer so the check below will make us return -1 */
 				else {

@@ -190,8 +190,14 @@ since \fBStart_Command\fP has been executed.The same token as in
 The following token are recognized in the \fBStart_Command\fP and
 \fBStop_Command\fP directives:
 .TP
+.B "%HOST%"
+The knocker's resolved hostname (if available).
+.TP
 .B "%IP%"
 The knocker's IP address.
+.TP
+.B "%NAME%"
+The name of the event.
 .TP
 .B "%TIME%"
 The UNIX timestamp.  Can be used to garbage-collect old rules via \fBcron\fP
