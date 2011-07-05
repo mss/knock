@@ -123,7 +123,7 @@ void generate_pcap_filter();
 size_t realloc_strcat(char **dest, const char *src, size_t size);
 void close_door(opendoor_t *door);
 char* get_ip(const char* iface, char *buf, int bufsize);
-ssize_t parse_cmd(char* dest, size_t size, const char* cmd, const char* ip);
+ssize_t parse_cmd(char* dest, size_t size, const char* cmd, const knocker_t* knocker);
 int exec_cmd(char* command, char* name);
 void sniff(u_char* arg, const struct pcap_pkthdr* hdr, const u_char* packet);
 
@@ -1126,7 +1126,7 @@ char* get_ip(const char* iface, char *buf, int bufsize)
  * size of dest, then the result has ben truncated. If the command contains an
  * unknown or broken token, -1 is returned.
  */
-ssize_t parse_cmd(char* dest, size_t size, const char* cmd, const char* ip) {
+ssize_t parse_cmd(char* dest, size_t size, const char* cmd, const knocker_t* knocker) {
 	size_t ip_len = 0;
 	const char *tok = NULL;
 	size_t tok_len = 0;
@@ -1158,6 +1158,7 @@ ssize_t parse_cmd(char* dest, size_t size, const char* cmd, const char* ip) {
 				}
 				/* paste the IP address if this is the IP token */
 				else if(memcmp(tok, "IP", tok_len) == 0) {
+					const char *ip = knocker->src;
 					if(!ip_len && ip) {
 						ip_len = strlen(ip);
 					}
@@ -1589,7 +1590,7 @@ void sniff(u_char* arg, const struct pcap_pkthdr* hdr, const u_char* packet)
 						
 						/* parse start and stop command and check if the parsed commands fit in the given buffer. Don't
 						 * execute any command if one of them has been truncated */
-						cmd_len = parse_cmd(parsed_start_cmd, sizeof(parsed_start_cmd), attempt->door->start_command, attempt->src);
+						cmd_len = parse_cmd(parsed_start_cmd, sizeof(parsed_start_cmd), attempt->door->start_command, attempt);
 						if(cmd_len < 0) {
 							fprintf(stderr, "error: start command is malformed! --> won't execute it\n");
 							logprint("error: start command is malformed! --> won't execute it");
@@ -1602,7 +1603,7 @@ void sniff(u_char* arg, const struct pcap_pkthdr* hdr, const u_char* packet)
 							exit(0); /* exit child */
 						}
 						if(attempt->door->stop_command) {
-							cmd_len = parse_cmd(parsed_stop_cmd, sizeof(parsed_stop_cmd), attempt->door->stop_command, attempt->src);
+							cmd_len = parse_cmd(parsed_stop_cmd, sizeof(parsed_stop_cmd), attempt->door->stop_command, attempt);
 							if(cmd_len < 0) {
 								fprintf(stderr, "error: stop command is malformed! --> won't execute it\n");
 								logprint("error: stop command is malformed! --> won't execute it");
