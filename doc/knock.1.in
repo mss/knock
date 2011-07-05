@@ -1,4 +1,4 @@
-.TH knock 1 "June 26, 2005" "knockd #VERSION#" ""
+.TH knock 1 "#DATE#" "knockd #VERSION#" ""
 .SH NAME
 knock \- port-knock client
 .SH SYNOPSIS

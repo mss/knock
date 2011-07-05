@@ -24,6 +24,7 @@ prefix = @prefix@
 exec_prefix = @prefix@
 
 VERSION = 0.5
+MANDATE = July 06, 2011
 
 BINDIR  = @bindir@
 SBINDIR = @sbindir@
@@ -62,7 +63,7 @@ knock: $(OBJDIR)knock.o
 man: $(MANSRC)knockd.1 $(MANSRC)knock.1
 
 %.1: %.1.in
-	sed -e "s/#VERSION#/$(VERSION)/" $< > $@
+	sed -e "s/#VERSION#/$(VERSION)/" -e "s/#MANDATE#/$(MANDATE)/" $< > $@
 
 dist: distclean
 	(cd ..; tar czvf knock-$(VERSION).tar.gz knock-$(VERSION))
