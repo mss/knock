@@ -197,6 +197,9 @@ The knocker's IP address.
 The UNIX timestamp.  Can be used to garbage-collect old rules via \fBcron\fP
 and the \fBcomment\fP module.  A wrapper script must then be used for a close
 rule since iptables needs the exact rule specification when removing rules.
+.TP
+.B "%%"
+An escaped percent sign, replaced by a sindle percent.
 .SH SECURITY NOTES 
 Using the \fB-l\fP or \fB--lookup\fP commandline option to resolve DNS names
 for log entries may be a security risk!  An attacker may find out the first port
