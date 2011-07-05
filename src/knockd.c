@@ -1129,7 +1129,6 @@ char* get_ip(const char* iface, char *buf, int bufsize)
 ssize_t parse_cmd(char* dest, size_t size, const char* cmd, const knocker_t* knocker) {
 	size_t ip_len = 0;
 	const char *tok = NULL;
-	size_t tok_len = 0;
 	size_t total_len = 0;
 	
 	/* make sure this string is always zero-teminated, even if we fill it
@@ -1147,7 +1146,7 @@ ssize_t parse_cmd(char* dest, size_t size, const char* cmd, const knocker_t* kno
 				tok = cmd + 1;
 			}
 			else {
-				tok_len = cmd - tok - 1;
+				size_t tok_len = cmd - tok - 1;
 				/* a zero token is an escaped percent sign */
 				if(tok_len == 0) {
 					if (size) {
