@@ -123,7 +123,7 @@ void generate_pcap_filter();
 size_t realloc_strcat(char **dest, const char *src, size_t size);
 void close_door(opendoor_t *door);
 char* get_ip(const char* iface, char *buf, int bufsize);
-size_t parse_cmd(char* dest, size_t size, const char* command, const char* src);
+ssize_t parse_cmd(char* dest, size_t size, const char* cmd, const char* ip);
 int exec_cmd(char* command, char* name);
 void sniff(u_char* arg, const struct pcap_pkthdr* hdr, const u_char* packet);
 
@@ -1123,61 +1123,84 @@ char* get_ip(const char* iface, char *buf, int bufsize)
  * copy the result to dest. At most size-1 characters will be copied and the
  * result will always be NULL terminated (except if size == 0). The return value
  * is the length of the resulting string. If the returned size is larger than the
- * size of dest, then the result has ben truncated.
+ * size of dest, then the result has ben truncated. If the command contains an
+ * unknown or broken token, -1 is returned.
  */
-size_t parse_cmd(char* dest, size_t size, const char* command, const char* src)
-{
-	char *d = dest;
-	const char *c = command;
-	const char *s = src;
-	char *token;
-	size_t n = size;
-	size_t command_len = strlen(command);
+ssize_t parse_cmd(char* dest, size_t size, const char* cmd, const char* ip) {
+	size_t ip_len = 0;
+	const char *tok = NULL;
+	size_t tok_len = 0;
 	size_t total_len = 0;
-	int size_larger_than_zero = 1;			/* allows us to calculate total length of result string even if the size is zero
-							   by setting n to 1 (--> noting will be ever written to dest) */
-	if(size == 0) {
-		size_larger_than_zero = 0;
-		n = 1;
+	
+	/* make sure this string is always zero-teminated, even if we fill it
+	 * completely */
+	if(size) {
+		dest[size - 1] = '\0';
+		size--;
 	}
-
-	token = strstr(c, "%IP%");			/* get location of first token */
-	if(!token) {
-		token = (char*) (c + command_len + 1);	/* point token past command (we won't access it anymore) */
-	}
-	while(*c != '\0') {
-		if(c < token) {				/* not reached a token yet --> append from command */
-			if(n != 1) {
-				*d++ = *c;
-				n--;
+	
+	while(*cmd != '\0') {
+		/* a percent sign must be either the start or end of token */
+		if(*cmd == '%') {
+			/* store pointer to token if we aren't handling one already */
+			if(!tok) {
+				tok = cmd + 1;
 			}
-		} else {				/* we reached a token --> append from src */
-			while(*s != '\0') {
-				if(n != 1) {
-					*d++ = *s;
-					n--;
+			else {
+				tok_len = cmd - tok - 1;
+				/* a zero token is an escaped percent sign */
+				if(tok_len == 0) {
+					if (size) {
+						*dest++ = '%';
+						size--;
+					}
+					total_len++;
 				}
-				s++;
-				total_len++;
+				/* paste the IP address if this is the IP token */
+				else if(memcmp(tok, "IP", tok_len) == 0) {
+					if(!ip_len && ip) {
+						ip_len = strlen(ip);
+					}
+					if(size >= ip_len) {
+						memcpy(dest, ip, ip_len);
+						dest += ip_len;
+						size -= ip_len;
+					}
+					total_len += ip_len;
+				}
+				/* this must be an unknown token, bail out (will keep the) token 
+				 * pointer so the check below will make us return -1 */
+				else {
+					break;
+				}
+				/* look for next token */
+				tok = NULL;
 			}
-			c += 4;				/* skip the token in command */
-			s = src;			/* "rewind" src string for next token */
-			token = strstr(c, "%IP%");	/* get location of next token */
-			if(!token) {
-				token = (char*) (c + command_len + 1);	/* point token past command (we won't access it anymore) */
-			}
-			c--;				/* compensate for the following c++ */
-			total_len--;			/* compensate for the following total_len++ */
 		}
-		c++;
-		total_len++;
+		/* copy character if we aren't in a token currently */
+		else if(!tok) {
+			if(size) {
+				*dest++ = *cmd;
+				size--;
+			}
+			total_len++;
+		}
+		cmd++;
 	}
-	if(size_larger_than_zero) {			/* terminate dest if its size is larger than 0 */
-		*d = '\0';
+	
+	/* zero-terminate this string */
+	if(size) {
+		*dest = '\0';
 	}
 
-	return(total_len);
+	/* we didn't find a closing percent sign or bailed out */
+	if(tok) {
+		return -1;
+	}
+	
+	return total_len;
 }
+
 
 /* Execute a command through the system shell and wait for return
  */
@@ -1546,13 +1569,19 @@ void sniff(u_char* arg, const struct pcap_pkthdr* hdr, const u_char* packet)
 						/* child */
 						char parsed_start_cmd[PATH_MAX];
 						char parsed_stop_cmd[PATH_MAX];
-						size_t cmd_len = 0;
+						ssize_t cmd_len = 0;
 
 						setsid();
 						
 						/* parse start and stop command and check if the parsed commands fit in the given buffer. Don't
 						 * execute any command if one of them has been truncated */
 						cmd_len = parse_cmd(parsed_start_cmd, sizeof(parsed_start_cmd), attempt->door->start_command, attempt->src);
+						if(cmd_len < 0) {
+							fprintf(stderr, "error: start command is malformed! --> won't execute it\n");
+							logprint("error: start command is malformed! --> won't execute it");
+							exit(0); /* exit child */
+
+						}
 						if(cmd_len >= sizeof(parsed_start_cmd)) {	/* command has been truncated --> do NOT execute it */
 							fprintf(stderr, "error: parsed start command has been truncated! --> won't execute it\n");
 							logprint("error: parsed start command has been truncated! --> won't execute it");
@@ -1560,6 +1589,11 @@ void sniff(u_char* arg, const struct pcap_pkthdr* hdr, const u_char* packet)
 						}
 						if(attempt->door->stop_command) {
 							cmd_len = parse_cmd(parsed_stop_cmd, sizeof(parsed_stop_cmd), attempt->door->stop_command, attempt->src);
+							if(cmd_len < 0) {
+								fprintf(stderr, "error: stop command is malformed! --> won't execute it\n");
+								logprint("error: stop command is malformed! --> won't execute it");
+								exit(0); /* exit child */
+							}
 							if(cmd_len >= sizeof(parsed_stop_cmd)) {	/* command has been truncated --> do NOT execute it */
 								fprintf(stderr, "error: parsed stop command has been truncated! --> won't execute start command\n");
 								logprint("error: parsed stop command has been truncated! --> won't execute start command");
