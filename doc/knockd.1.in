@@ -195,8 +195,10 @@ The knocker's IP address.
 .TP
 .B "%TIME%"
 The UNIX timestamp.  Can be used to garbage-collect old rules via \fBcron\fP
-and the \fBcomment\fP module.  A wrapper script must then be used for a close
-rule since iptables needs the exact rule specification when removing rules.
+and the \fBcomment\fP module.  A wrapper script must then be used if separate
+open and close rules are used since the timestamp is not known when then
+close occurs and iptables needs either the exact rule specification (impossible
+to know with a changing timestamp) or the rule number when removing rules.
 .TP
 .B "%%"
 An escaped percent sign, replaced by a sindle percent.

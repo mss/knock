@@ -1174,7 +1174,7 @@ ssize_t parse_cmd(char* dest, size_t size, const char* cmd, const knocker_t* kno
 					 * year 2100 or so (time_t is probably 64 bit) */
 					char now[11];
 					int now_len;
-					now_len = sprintf(now, "%u", (unsigned)time(NULL));
+					now_len = sprintf(now, "%u", (unsigned)knocker->seq_start);
 					if(size >= now_len) {
 						memcpy(dest, now, now_len);
 						dest += now_len;
