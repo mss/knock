@@ -19,6 +19,8 @@
  *  USA.
  */
 
+#include "config.h"
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdarg.h>
@@ -36,7 +38,7 @@
 #include <getopt.h>
 #include <fcntl.h>
 
-static char version[] = "0.5";
+static char version[] = PACKAGE_VERSION;
 
 #define PROTO_TCP 1
 #define PROTO_UDP 2

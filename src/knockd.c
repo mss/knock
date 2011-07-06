@@ -19,6 +19,8 @@
  *  USA.
  */
 
+#include "config.h"
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdarg.h>
@@ -55,7 +57,7 @@
 #include <errno.h>
 #include "list.h"
 
-static char version[] = "0.5";
+static char version[] = PACKAGE_VERSION;
 
 #define SEQ_TIMEOUT 25 /* default knock timeout in seconds */
 #define CMD_TIMEOUT 10 /* default timeout in seconds between start and stop commands */
