@@ -23,7 +23,7 @@ DESTDIR =
 prefix = @prefix@
 exec_prefix = @prefix@
 
-VERSION = 0.5
+VERSION = @PACKAGE_VERSION@
 MANDATE = July 06, 2011
 
 BINDIR  = @bindir@
@@ -40,10 +40,11 @@ SRCDIR = $(TOPDIR)/src/
 OBJDIR = $(TOPDIR)/src/
 MANSRC = $(TOPDIR)/doc/
 
-CXX = @CC@
-CXXFLAGS += @CFLAGS@ -g -Wall -pedantic -fno-exceptions \
-            -D_GNU_SOURCE -I.
-LDFLAGS += @LDFLAGS@
+CC = @CC@
+CFLAGS = @CFLAGS@
+CFLAGS += -Wall -pedantic -fno-exceptions
+CFLAGS += -D_GNU_SOURCE -I.
+LDFLAGS = @LDFLAGS@
 
 SRCS = $(SRCDIR)knockd.c \
 			 $(SRCDIR)knock.c \
@@ -52,20 +53,29 @@ SRCS = $(SRCDIR)knockd.c \
 all: knockd knock man
 
 knockd: $(OBJDIR)knockd.o $(OBJDIR)list.o
-	$(CXX) $(OBJDIR)knockd.o $(OBJDIR)list.o -o $@ $(LDFLAGS) -lpcap
+	$(CC) $(OBJDIR)knockd.o $(OBJDIR)list.o -o $@ $(LDFLAGS) -lpcap
 
 knock: $(OBJDIR)knock.o
-	$(CXX) $(OBJDIR)knock.o -o $@ $(LDFLAGS)
+	$(CC) $(OBJDIR)knock.o -o $@ $(LDFLAGS)
 
-.c.o: $(SRCS)
-	$(CXX) $(CXXFLAGS) -o $@ -c $<
+.c.o:
+	$(CC) $(CFLAGS) -o $@ -c $<
+
+$(OBJDIR)knockd.o: $(SRCDIR)list.h
+$(OBJDIR)knock.o:
+$(OBJDIR)list.o: $(SRCDIR)list.h
 
 man: $(MANSRC)knockd.1 $(MANSRC)knock.1
 
 %.1: %.1.in
 	sed -e "s/#VERSION#/$(VERSION)/" -e "s/#MANDATE#/$(MANDATE)/" $< > $@
 
-dist: distclean
+prepare:
+	autoheader
+	autoconf
+	rm -fr autom4te.cache
+
+dist: distclean prepare
 	(cd ..; tar czvf knock-$(VERSION).tar.gz knock-$(VERSION))
 
 install: all
@@ -76,10 +86,12 @@ install: all
 	$(INSTALL) -D -m0644 knockd.conf $(DESTDIR)/etc/knockd.conf
 
 clean:
-	rm -f *~ $(OBJDIR)*.o $(MANSRC)*.1
+	rm -f knockd knock
+	rm -f *~
+	rm -f $(OBJDIR)*.o
+	rm -f $(MANSRC)*.1
 
 distclean: clean
-	rm -f knockd knock
 	rm -f Makefile
 	rm -f config.h config.status config.log
 
