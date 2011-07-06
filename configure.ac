@@ -2,7 +2,7 @@
 # Process this file with autoconf to produce a configure script.
 
 AC_PREREQ([2.65])
-AC_INIT([knock], [0.5], [], [], [http://www.zeroflux.org/projects/knock])
+AC_INIT([knock(d)], [0.5], [], [knock], [http://www.zeroflux.org/projects/knock])
 AC_CONFIG_SRCDIR([configure.ac])
 AC_CONFIG_HEADER([config.h])
 

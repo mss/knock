@@ -25,6 +25,7 @@ exec_prefix = @prefix@
 
 VERSION = @PACKAGE_VERSION@
 MANDATE = July 06, 2011
+TARNAME = @PACKAGE_TARNAME@
 
 BINDIR  = @bindir@
 SBINDIR = @sbindir@
@@ -76,7 +77,7 @@ prepare:
 	rm -fr autom4te.cache
 
 dist: distclean prepare
-	(cd ..; tar czvf knock-$(VERSION).tar.gz knock-$(VERSION))
+	(cd ..; tar czvf $(TARNAME)-$(VERSION).tar.gz $(TARNAME)-$(VERSION))
 
 install: all
 	$(INSTALL) -D -m0755 knockd $(DESTDIR)$(SBINDIR)/knockd
