@@ -45,6 +45,7 @@ CC = @CC@
 CFLAGS = @CFLAGS@
 CFLAGS += -Wall -pedantic -fno-exceptions
 CFLAGS += -D_GNU_SOURCE -I.
+CFLAGS += -DSYSLOG_NAMES
 LDFLAGS = @LDFLAGS@
 
 SRCS = $(SRCDIR)knockd.c \

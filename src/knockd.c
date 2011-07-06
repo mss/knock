@@ -135,6 +135,7 @@ int lltype = -1;
 char myip[32];
 
 int  o_usesyslog = 0;
+int  o_syslog    = LOG_DAEMON;
 int  o_verbose   = 0;
 int  o_debug     = 0;
 int  o_daemon    = 0;
@@ -202,7 +203,7 @@ int main(int argc, char **argv)
 		strncpy(o_int, "eth0", sizeof(o_int));	/* no explicit termination needed */
 	}
 	if(o_usesyslog) {
-		openlog("knockd", 0, LOG_DAEMON);
+		openlog("knockd", 0, o_syslog);
 	}
 	if(strlen(o_logfile)) {
 		/* open the log file */
@@ -561,6 +562,22 @@ int parseconfig(char *configfile)
 							strncpy(o_int, ptr, sizeof(o_int)-1);
 							o_int[sizeof(o_int)-1] = '\0';
 							dprint("config: interface: %s\n", o_int);
+						}
+					} else if(!strcmp(key, "SYSLOGFACILITY")) {
+						int i = 0;
+						while(1) {
+							/* from syslog.h */
+							const char *name = facilitynames[i].c_name;
+							if(!name) {
+								fprintf(stderr, "config: line %d: unknown facility\n", linenum);
+								return 1;
+							}
+							if(!strcmp(name, ptr)) {
+								o_syslog = facilitynames[i].c_val;
+								dprint("config: syslogfacility: %s (%d)\n", name, o_syslog);
+								break;
+							}
+							i++;
 						}
 					} else {
 						fprintf(stderr, "config: line %d: syntax error\n", linenum);
