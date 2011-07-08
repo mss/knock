@@ -67,6 +67,38 @@
 
 #include "list.h"
 
+#ifdef BSDISH
+#define ETH_T struct ether_header
+#define ETH_HAS_IP(eth) (ntohs(eth->ether_type) == ETHERTYPE_IP)
+#define IP_T struct ip
+#define IP_GET_HL(ip) (ip->hl)
+#define IP_GET_PROTO(ip) (ip->ip_p)
+#define IP_GET_SADDR(ip) (ip->ip_src.s_addr)
+#define IP_GET_DADDR(ip) (ip->ip_dst.s_addr)
+#define TCP_T struct tcphdr
+#define TCP_GET_SPORT(tcp) (tcp->th_sport)
+#define TCP_GET_DPORT(tcp) (tcp->th_sport)
+#define TCP_HAS_FLAG(tcp, field, flag) (tcp->th_flags & flag)
+#define UDP_T struct udphdr
+#define UDP_GET_SPORT(udp) (udp->uh_sport)
+#define UDP_GET_DPORT(udp) (udp->uh_sport)
+#else
+#define ETH_T struct ethhdr
+#define ETH_HAS_IP(eth) (ntohs(eth->h_proto) == ETH_P_IP)
+#define IP_T struct iphdr
+#define IP_GET_HL(ip) (ip->ihl)
+#define IP_GET_PROTO(ip) (ip->protocol)
+#define IP_GET_SADDR(ip) (ip->saddr)
+#define IP_GET_DADDR(ip) (ip->daddr)
+#define TCP_T struct tcphdr
+#define TCP_GET_SPORT(tcp) (tcp->source)
+#define TCP_GET_DPORT(tcp) (tcp->dest)
+#define TCP_HAS_FLAG(tcp, field, flag) (tcp->field)
+#define UDP_T struct udphdr
+#define UDP_GET_SPORT(udp) (udp->source)
+#define UDP_GET_DPORT(udp) (udp->dest)
+#endif
+
 
 static char version[] = PACKAGE_VERSION;
 
@@ -1295,15 +1327,10 @@ int exec_cmd(char* command, char* name){
 void sniff(u_char* arg, const struct pcap_pkthdr* hdr, const u_char* packet)
 {
 	/* packet structs */
-#ifdef BSDISH
-	struct ether_header* eth = NULL;
-	struct ip* ip = NULL;
-#else
-	struct ethhdr* eth = NULL;
-	struct iphdr* ip   = NULL;
-#endif	
-	struct tcphdr* tcp = NULL;
-	struct udphdr* udp = NULL;
+	ETH_T* eth = NULL;
+	IP_T* ip   = NULL;
+	TCP_T* tcp = NULL;
+	UDP_T* udp = NULL;
 	char proto[8];
 	/* TCP/IP data */	
 	struct in_addr inaddr;
@@ -1317,43 +1344,26 @@ void sniff(u_char* arg, const struct pcap_pkthdr* hdr, const u_char* packet)
 	PMList *lp;
 	knocker_t *attempt = NULL;
 	
-#ifdef BSDISH
 	if(lltype == DLT_EN10MB) {
-		eth = (struct ether_header*)packet;
-		if(ntohs(eth->ether_type) != ETHERTYPE_IP) {
+		eth = (ETH_T*)packet;
+		if(!ETH_HAS_IP(eth)) {
 			return;
 		}
 		
-		ip = (struct ip*)(packet + sizeof(struct ether_header));
+		ip = (IP_T*)(packet + sizeof(ETH_T));
 	} else if(lltype == DLT_LINUX_SLL) {
-		ip = (struct ip*)((u_char*)packet + 16);
+		ip = (IP_T*)((u_char*)packet + 16);
 	} else if(lltype == DLT_RAW) {
-		ip = (struct ip*)((u_char*)packet);
+		ip = (IP_T*)((u_char*)packet);
 	}
-#else
-	if(lltype == DLT_EN10MB) {
-		eth = (struct ethhdr*)packet;
-		if(ntohs(eth->h_proto) != ETH_P_IP) {
-			return;
-		}
 
-		ip = (struct iphdr*)(packet + sizeof(struct ethhdr));
-	} else if(lltype == DLT_LINUX_SLL) {
-		ip = (struct iphdr*)((u_char*)packet + 16);
-	} else if(lltype == DLT_RAW) {
-		ip = (struct iphdr*)((u_char*)packet);
-	}
-#endif
 	if(ip->version != 4) {	
 		/* no IPv6 yet */
 		dprint("packet is not IPv4, ignoring...\n");
 		return;
 	}
-#ifdef BSDISH
-	if(ip->ip_p == IPPROTO_ICMP) {
-#else
-	if(ip->protocol == IPPROTO_ICMP) {
-#endif	
+	
+	if(IP_GET_PROTO(ip) == IPPROTO_ICMP) {
 		/* we don't do ICMP */
 		return;
 	}
@@ -1365,42 +1375,24 @@ void sniff(u_char* arg, const struct pcap_pkthdr* hdr, const u_char* packet)
 		fprintf(stderr, "error: could not understand IP address: %s\n", myip);
 		return;
 	}
-#ifdef BSDISH
-	if(ip->ip_dst.s_addr != inaddr.s_addr) {
-#else
-	if(ip->daddr != inaddr.s_addr) {
-#endif	
+
+	if(IP_GET_DADDR(ip) != inaddr.s_addr) {
 		dprint("packet destined for another host, ignoring...\n");
 		return;
 	}
 	
 	sport = dport = 0;
-
-#ifdef BSDISH
-	if(ip->ip_p == IPPROTO_TCP) {
+	if(IP_GET_PROTO(ip) == IPPROTO_TCP) {
 		strncpy(proto, "tcp", sizeof(proto));
-		tcp = (struct tcphdr*)((u_char*)ip + (ip->ip_hl *4));
-		sport = ntohs(tcp->th_sport);
-		dport = ntohs(tcp->th_dport);
+		tcp = (TCP_T*)((u_char*)ip + IP_GET_HL(ip) * 4);
+		sport = ntohs(TCP_GET_SPORT(tcp));
+		dport = ntohs(TCP_GET_DPORT(tcp));
 	}
-	if(ip->ip_p == IPPROTO_UDP) {
+	if(IP_GET_PROTO(ip) == IPPROTO_UDP) {
 		strncpy(proto, "udp", sizeof(proto));
-		udp = (struct udphdr*)((u_char*)ip + (ip->ip_hl * 4));
-		sport = ntohs(udp->uh_sport);
-		dport = ntohs(udp->uh_dport);
-#else
-	if(ip->protocol == IPPROTO_TCP) {
-		strncpy(proto, "tcp", sizeof(proto));
-		tcp = (struct tcphdr*)((u_char*)ip + (ip->ihl * 4));		
-		sport = ntohs(tcp->source);
-		dport = ntohs(tcp->dest);
-	}
-	if(ip->protocol == IPPROTO_UDP) {
-		strncpy(proto, "udp", sizeof(proto));
-		udp = (struct udphdr*)((u_char*)ip + (ip->ihl * 4));
-		sport = ntohs(udp->source);
-		dport = ntohs(udp->dest);
-#endif
+		udp = (UDP_T*)((u_char*)ip + IP_GET_HL(ip) * 4);
+		sport = ntohs(UDP_GET_SPORT(udp));
+		dport = ntohs(UDP_GET_DPORT(udp));
 	}
 
 	/* get the date/time */
@@ -1411,17 +1403,10 @@ void sniff(u_char* arg, const struct pcap_pkthdr* hdr, const u_char* packet)
 			pkt_tm->tm_sec);
 
 	/* convert IPs from binary to string */
-#ifdef BSDISH
-	inaddr.s_addr = ip->ip_src.s_addr;
+	inaddr.s_addr = IP_GET_SADDR(ip);
 	strncpy(srcIP, inet_ntoa(inaddr), sizeof(srcIP)-1);
 	srcIP[sizeof(srcIP)-1] = '\0';
-	inaddr.s_addr = ip->ip_dst.s_addr;
-#else
-	inaddr.s_addr = ip->saddr;
-	strncpy(srcIP, inet_ntoa(inaddr), sizeof(srcIP)-1);
-	srcIP[sizeof(srcIP)-1] = '\0';
-	inaddr.s_addr = ip->daddr;
-#endif	
+	inaddr.s_addr = IP_GET_DADDR(ip);
 	strncpy(dstIP, inet_ntoa(inaddr), sizeof(dstIP)-1);
 	dstIP[sizeof(dstIP)-1] = '\0';
 
@@ -1481,138 +1466,70 @@ void sniff(u_char* arg, const struct pcap_pkthdr* hdr, const u_char* packet)
 		/* if tcp, check the flags to ignore the packets we don't want
 		 * (don't even use it to cancel sequences)
 		 */
-#ifdef BSDISH
-		if(ip->ip_p == IPPROTO_TCP) {
+		if(IP_GET_PROTO(ip) == IPPROTO_TCP) {
 			if(attempt->door->flag_fin != DONT_CARE) {
-				if(attempt->door->flag_fin == SET && !(tcp->th_flags & TH_FIN)) {
+				if(attempt->door->flag_fin == SET && !TCP_HAS_FLAG(tcp, fin, TH_FIN)) {
 					dprint("packet is not FIN, ignoring...\n");
 					flagsmatch = 0;
 				}
-				if(attempt->door->flag_fin == NOT_SET && (tcp->th_flags & TH_FIN)) {
+				if(attempt->door->flag_fin == NOT_SET && TCP_HAS_FLAG(tcp, fin, TH_FIN)) {
 					dprint("packet is not !FIN, ignoring...\n");
 					flagsmatch = 0;
 				}
 			}
 			if(attempt->door->flag_syn != DONT_CARE) {
-				if(attempt->door->flag_syn == SET && !(tcp->th_flags & TH_SYN)) {
+				if(attempt->door->flag_syn == SET && !TCP_HAS_FLAG(tcp, syn, TH_SYN)) {
 					dprint("packet is not SYN, ignoring...\n");
 					flagsmatch = 0;
 				}
-				if(attempt->door->flag_syn == NOT_SET && (tcp->th_flags & TH_SYN)) {
+				if(attempt->door->flag_syn == NOT_SET && TCP_HAS_FLAG(tcp, syn, TH_SYN)) {
 					dprint("packet is not !SYN, ignoring...\n");
 					flagsmatch = 0;
 				}
 			}
 			if(attempt->door->flag_rst != DONT_CARE) {
-				if(attempt->door->flag_rst == SET && !(tcp->th_flags & TH_RST)) {
+				if(attempt->door->flag_rst == SET && !TCP_HAS_FLAG(tcp, rst, TH_RST)) {
 					dprint("packet is not RST, ignoring...\n");
 					flagsmatch = 0;
 				}
-				if(attempt->door->flag_rst == NOT_SET && (tcp->th_flags & TH_RST)) {
+				if(attempt->door->flag_rst == NOT_SET && TCP_HAS_FLAG(tcp, rst, TH_RST)) {
 					dprint("packet is not !RST, ignoring...\n");
 					flagsmatch = 0;
 				}
 			}
 			if(attempt->door->flag_psh != DONT_CARE) {
-				if(attempt->door->flag_psh == SET && !(tcp->th_flags & TH_PUSH)) {
+				if(attempt->door->flag_psh == SET && !TCP_HAS_FLAG(tcp, psh, TH_PUSH)) {
 					dprint("packet is not PSH, ignoring...\n");
 					flagsmatch = 0;
 				}
-				if(attempt->door->flag_psh == NOT_SET && (tcp->th_flags & TH_PUSH)) {
+				if(attempt->door->flag_psh == NOT_SET && TCP_HAS_FLAG(tcp, psh, TH_PUSH)) {
 					dprint("packet is not !PSH, ignoring...\n");
 					flagsmatch = 0;
 				}
 			}
 			if(attempt->door->flag_ack != DONT_CARE) {
-				if(attempt->door->flag_ack == SET && !(tcp->th_flags & TH_ACK)) {
+				if(attempt->door->flag_ack == SET && !TCP_HAS_FLAG(tcp, ack, TH_ACK)) {
 					dprint("packet is not ACK, ignoring...\n");
 					flagsmatch = 0;
 				}
-				if(attempt->door->flag_ack == NOT_SET && !(tcp->th_flags & TH_ACK)) {
+				if(attempt->door->flag_ack == NOT_SET && TCP_HAS_FLAG(tcp, ack, TH_ACK)) {
 					dprint("packet is not !ACK, ignoring...\n");
 					flagsmatch = 0;
 				}
 			}
 			if(attempt->door->flag_urg != DONT_CARE) {
-				if(attempt->door->flag_urg == SET && !(tcp->th_flags & TH_URG)) {
+				if(attempt->door->flag_urg == SET && !TCP_HAS_FLAG(tcp, urg, TH_URG)) {
 					dprint("packet is not URG, ignoring...\n");
 					flagsmatch = 0;
 				}
-				if(attempt->door->flag_urg == NOT_SET && !(tcp->th_flags & TH_URG)) {
+				if(attempt->door->flag_urg == NOT_SET && TCP_HAS_FLAG(tcp, urg, TH_URG)) {
 					dprint("packet is not !URG, ignoring...\n");
 					flagsmatch = 0;
 				}
 			}
 		}
-		if(flagsmatch && ip->ip_p == attempt->door->protocol[attempt->stage] &&
+		if(flagsmatch && IP_GET_PROTO(ip) == attempt->door->protocol[attempt->stage] &&
 				dport == attempt->door->sequence[attempt->stage]) {
-
-#else
-		if(ip->protocol == IPPROTO_TCP) {
-			if(attempt->door->flag_fin != DONT_CARE) {
-				if(attempt->door->flag_fin == SET && tcp->fin != 1) {
-					dprint("packet is not FIN, ignoring...\n");
-					flagsmatch = 0;
-				}
-				if(attempt->door->flag_fin == NOT_SET && tcp->fin == 1) {
-					dprint("packet is not !FIN, ignoring...\n");
-					flagsmatch = 0;
-				}
-			}
-			if(attempt->door->flag_syn != DONT_CARE) {
-				if(attempt->door->flag_syn == SET && tcp->syn != 1) {
-					dprint("packet is not SYN, ignoring...\n");
-					flagsmatch = 0;
-				}
-				if(attempt->door->flag_syn == NOT_SET && tcp->syn == 1) {
-					dprint("packet is not !SYN, ignoring...\n");
-					flagsmatch = 0;
-				}
-			}
-			if(attempt->door->flag_rst != DONT_CARE) {
-				if(attempt->door->flag_rst == SET && tcp->rst != 1) {
-					dprint("packet is not RST, ignoring...\n");
-					flagsmatch = 0;
-				}
-				if(attempt->door->flag_rst == NOT_SET && tcp->rst == 1) {
-					dprint("packet is not !RST, ignoring...\n");
-					flagsmatch = 0;
-				}
-			}
-			if(attempt->door->flag_psh != DONT_CARE) {
-				if(attempt->door->flag_psh == SET && tcp->psh != 1) {
-					dprint("packet is not PSH, ignoring...\n");
-					flagsmatch = 0;
-				}
-				if(attempt->door->flag_psh == NOT_SET && tcp->psh == 1) {
-					dprint("packet is not !PSH, ignoring...\n");
-					flagsmatch = 0;
-				}
-			}
-			if(attempt->door->flag_ack != DONT_CARE) {
-				if(attempt->door->flag_ack == SET && tcp->ack != 1) {
-					dprint("packet is not ACK, ignoring...\n");
-					flagsmatch = 0;
-				}
-				if(attempt->door->flag_ack == NOT_SET && tcp->ack == 1) {
-					dprint("packet is not !ACK, ignoring...\n");
-					flagsmatch = 0;
-				}
-			}
-			if(attempt->door->flag_urg != DONT_CARE) {
-				if(attempt->door->flag_urg == SET && tcp->urg != 1) {
-					dprint("packet is not URG, ignoring...\n");
-					flagsmatch = 0;
-				}
-				if(attempt->door->flag_urg == NOT_SET && tcp->urg == 1) {
-					dprint("packet is not !URG, ignoring...\n");
-					flagsmatch = 0;
-				}
-			}
-		}
-		if(flagsmatch && ip->protocol == attempt->door->protocol[attempt->stage] &&
-				dport == attempt->door->sequence[attempt->stage]) {
-#endif				
 			/* level up! */
 			attempt->stage++;
 			if(attempt->srchost) {
@@ -1714,65 +1631,70 @@ void sniff(u_char* arg, const struct pcap_pkthdr* hdr, const u_char* packet)
 		for(lp = doors; lp; lp = lp->next) {
 			opendoor_t *door = (opendoor_t*)lp->data;
 			/* if we're working with TCP, try to match the flags */
-#ifdef BSDISH
-			if(ip->ip_p == IPPROTO_TCP){
+			if(IP_GET_PROTO(ip) == IPPROTO_TCP){
 				if(door->flag_fin != DONT_CARE) {
-					if(door->flag_fin == SET && !(tcp->th_flags & TH_FIN)) {dprint("packet is not FIN, ignoring...\n");continue;}
-					if(door->flag_fin == NOT_SET && (tcp->th_flags & TH_FIN)) {dprint("packet is not !FIN, ignoring...\n");continue;}
+					if(door->flag_fin == SET && !TCP_HAS_FLAG(tcp, fin, TH_FIN)) {
+						dprint("packet is not FIN, ignoring...\n");
+						continue;
+					}
+					if(door->flag_fin == NOT_SET && TCP_HAS_FLAG(tcp, fin, TH_FIN)) {
+						dprint("packet is not !FIN, ignoring...\n");
+						continue;
+					}
 				}
 				if(door->flag_syn != DONT_CARE) {
-					if(door->flag_syn == SET && !(tcp->th_flags & TH_SYN)) {dprint("packet is not SYN, ignoring...\n");continue;}
-					if(door->flag_syn == NOT_SET && (tcp->th_flags & TH_SYN)) {dprint("packet is not !SYN, ignoring...\n");continue;}
+					if(door->flag_syn == SET && !TCP_HAS_FLAG(tcp, syn, TH_SYN)) {
+						dprint("packet is not SYN, ignoring...\n");
+						continue;
+					}
+					if(door->flag_syn == NOT_SET && TCP_HAS_FLAG(tcp, syn, TH_SYN)) {
+						dprint("packet is not !SYN, ignoring...\n");
+						continue;
+					}
 				}
 				if(door->flag_rst != DONT_CARE) {
-					if(door->flag_rst == SET && !(tcp->th_flags & TH_RST)) {dprint("packet is not RST, ignoring...\n");continue;}
-					if(door->flag_rst == NOT_SET && (tcp->th_flags & TH_RST)) {dprint("packet is not !RST, ignoring...\n");continue;}
+					if(door->flag_rst == SET && !TCP_HAS_FLAG(tcp, rst, TH_RST)) {
+						dprint("packet is not RST, ignoring...\n");#
+							continue;
+					}
+					if(door->flag_rst == NOT_SET && TCP_HAS_FLAG(tcp, rst, TH_RST)) {
+						dprint("packet is not !RST, ignoring...\n");
+						continue;
+					}
 				}
 				if(door->flag_psh != DONT_CARE) {
-					if(door->flag_psh == SET && !(tcp->th_flags & TH_PUSH)) {dprint("packet is not PSH, ignoring...\n");continue;}
-					if(door->flag_psh == NOT_SET && (tcp->th_flags & TH_PUSH)) {dprint("packet is not !PSH, ignoring...\n");continue;}
+					if(door->flag_psh == SET && !TCP_HAS_FLAG(tcp, psh, TH_PUSH)) {
+						dprint("packet is not PSH, ignoring...\n");
+						continue;
+					}
+					if(door->flag_psh == NOT_SET && TCP_HAS_FLAG(tcp, psh, TH_PUSH)) {
+						dprint("packet is not !PSH, ignoring...\n");
+						continue;
+					}
 				}
 				if(door->flag_ack != DONT_CARE) {
-					if(door->flag_ack == SET && !(tcp->th_flags & TH_ACK)) {dprint("packet is not ACK, ignoring...\n");continue;}
-					if(door->flag_ack == NOT_SET && (tcp->th_flags & TH_ACK)) {dprint("packet is not !ACK, ignoring...\n");continue;}
+					if(door->flag_ack == SET && !TCP_HAS_FLAG(tcp, ack, TH_ACK)) {
+						dprint("packet is not ACK, ignoring...\n");
+						continue;
+					}
+					if(door->flag_ack == NOT_SET && TCP_HAS_FLAG(tcp, ack, TH_ACK)) {
+						dprint("packet is not !ACK, ignoring...\n");
+						continue;
+					}
 				}
 				if(door->flag_urg != DONT_CARE) {
-					if(door->flag_urg == SET && !(tcp->th_flags & TH_URG)) {dprint("packet is not URG, ignoring...\n");continue;}
-					if(door->flag_urg == NOT_SET && (tcp->th_flags & TH_URG)) {dprint("packet is not !URG, ignoring...\n");continue;}
+					if(door->flag_urg == SET && !TCP_HAS_FLAG(tcp, urg, TH_URG)) {
+						dprint("packet is not URG, ignoring...\n");
+						continue;
+					}
+					if(door->flag_urg == NOT_SET && TCP_HAS_FLAG(tcp, urg, TH_URG)) {
+						dprint("packet is not !URG, ignoring...\n");
+						continue;
+					}
 				}
 			}
 
-			if(ip->ip_p == door->protocol[0] && dport == door->sequence[0]) {			
-#else
-			if(ip->protocol == IPPROTO_TCP){
-				if(door->flag_fin != DONT_CARE) {
-					if(door->flag_fin == SET && tcp->fin != 1) {dprint("packet is not FIN, ignoring...\n");continue;}
-					if(door->flag_fin == NOT_SET && tcp->fin == 1) {dprint("packet is not !FIN, ignoring...\n");continue;}
-				}
-				if(door->flag_syn != DONT_CARE) {
-					if(door->flag_syn == SET && tcp->syn != 1) {dprint("packet is not SYN, ignoring...\n");continue;}
-					if(door->flag_syn == NOT_SET && tcp->syn == 1) {dprint("packet is not !SYN, ignoring...\n");continue;}
-				}
-				if(door->flag_rst != DONT_CARE) {
-					if(door->flag_rst == SET && tcp->rst != 1) {dprint("packet is not RST, ignoring...\n");continue;}
-					if(door->flag_rst == NOT_SET && tcp->rst == 1) {dprint("packet is not !RST, ignoring...\n");continue;}
-				}
-				if(door->flag_psh != DONT_CARE) {
-					if(door->flag_psh == SET && tcp->psh != 1) {dprint("packet is not PSH, ignoring...\n");continue;}
-					if(door->flag_psh == NOT_SET && tcp->psh == 1) {dprint("packet is not !PSH, ignoring...\n");continue;}
-				}
-				if(door->flag_ack != DONT_CARE) {
-					if(door->flag_ack == SET && tcp->ack != 1) {dprint("packet is not ACK, ignoring...\n");continue;}
-					if(door->flag_ack == NOT_SET && tcp->ack == 1) {dprint("packet is not !ACK, ignoring...\n");continue;}
-				}
-				if(door->flag_urg != DONT_CARE) {
-					if(door->flag_urg == SET && tcp->urg != 1) {dprint("packet is not URG, ignoring...\n");continue;}
-					if(door->flag_urg == NOT_SET && tcp->urg == 1) {dprint("packet is not !URG, ignoring...\n");continue;}
-				}
-			}
-
-			if(ip->protocol == door->protocol[0] && dport == door->sequence[0]) {
-#endif
+			if(IP_GET_PROTO(ip) == door->protocol[0] && dport == door->sequence[0]) {
 				struct hostent *he;
 				/* create a new entry */
 				attempt = (knocker_t*)malloc(sizeof(knocker_t));
@@ -1784,11 +1706,7 @@ void sniff(u_char* arg, const struct pcap_pkthdr* hdr, const u_char* packet)
 				strcpy(attempt->src, srcIP);
 				/* try a reverse lookup if enabled  */
 				if (o_lookup) {
-#ifdef BSDISH
-					inaddr.s_addr = ip->ip_src.s_addr;
-#else
-					inaddr.s_addr = ip->saddr;
-#endif					
+					inaddr.s_addr = IP_GET_SADDR(ip);
 					he = gethostbyaddr((void *)&inaddr, sizeof(inaddr), AF_INET);
 					if(he) {
 						attempt->srchost = strdup(he->h_name);
