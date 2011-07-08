@@ -1359,7 +1359,7 @@ void sniff(u_char* arg, const struct pcap_pkthdr* hdr, const u_char* packet)
 
 	if(ip->version != 4) {	
 		/* no IPv6 yet */
-		dprint("packet is not IPv4, ignoring...\n");
+		dprint("packet is not %s, ignoring...\n", "IPv4");
 		return;
 	}
 	
@@ -1469,61 +1469,61 @@ void sniff(u_char* arg, const struct pcap_pkthdr* hdr, const u_char* packet)
 		if(IP_GET_PROTO(ip) == IPPROTO_TCP) {
 			if(attempt->door->flag_fin != DONT_CARE) {
 				if(attempt->door->flag_fin == SET && !TCP_HAS_FLAG(tcp, fin, TH_FIN)) {
-					dprint("packet is not FIN, ignoring...\n");
+					dprint("packet is not %s, ignoring...\n", "FIN");
 					flagsmatch = 0;
 				}
 				if(attempt->door->flag_fin == NOT_SET && TCP_HAS_FLAG(tcp, fin, TH_FIN)) {
-					dprint("packet is not !FIN, ignoring...\n");
+					dprint("packet is not %s, ignoring...\n", "!FIN");
 					flagsmatch = 0;
 				}
 			}
 			if(attempt->door->flag_syn != DONT_CARE) {
 				if(attempt->door->flag_syn == SET && !TCP_HAS_FLAG(tcp, syn, TH_SYN)) {
-					dprint("packet is not SYN, ignoring...\n");
+					dprint("packet is not %s, ignoring...\n", "SYN");
 					flagsmatch = 0;
 				}
 				if(attempt->door->flag_syn == NOT_SET && TCP_HAS_FLAG(tcp, syn, TH_SYN)) {
-					dprint("packet is not !SYN, ignoring...\n");
+					dprint("packet is not %s, ignoring...\n", "!SYN");
 					flagsmatch = 0;
 				}
 			}
 			if(attempt->door->flag_rst != DONT_CARE) {
 				if(attempt->door->flag_rst == SET && !TCP_HAS_FLAG(tcp, rst, TH_RST)) {
-					dprint("packet is not RST, ignoring...\n");
+					dprint("packet is not %s, ignoring...\n", "RST");
 					flagsmatch = 0;
 				}
 				if(attempt->door->flag_rst == NOT_SET && TCP_HAS_FLAG(tcp, rst, TH_RST)) {
-					dprint("packet is not !RST, ignoring...\n");
+					dprint("packet is not %s, ignoring...\n", "!RST");
 					flagsmatch = 0;
 				}
 			}
 			if(attempt->door->flag_psh != DONT_CARE) {
 				if(attempt->door->flag_psh == SET && !TCP_HAS_FLAG(tcp, psh, TH_PUSH)) {
-					dprint("packet is not PSH, ignoring...\n");
+					dprint("packet is not %s, ignoring...\n", "PSH");
 					flagsmatch = 0;
 				}
 				if(attempt->door->flag_psh == NOT_SET && TCP_HAS_FLAG(tcp, psh, TH_PUSH)) {
-					dprint("packet is not !PSH, ignoring...\n");
+					dprint("packet is not %s, ignoring...\n", "!PSH");
 					flagsmatch = 0;
 				}
 			}
 			if(attempt->door->flag_ack != DONT_CARE) {
 				if(attempt->door->flag_ack == SET && !TCP_HAS_FLAG(tcp, ack, TH_ACK)) {
-					dprint("packet is not ACK, ignoring...\n");
+					dprint("packet is not %s, ignoring...\n", "ACK");
 					flagsmatch = 0;
 				}
 				if(attempt->door->flag_ack == NOT_SET && TCP_HAS_FLAG(tcp, ack, TH_ACK)) {
-					dprint("packet is not !ACK, ignoring...\n");
+					dprint("packet is not %s, ignoring...\n", "!ACK");
 					flagsmatch = 0;
 				}
 			}
 			if(attempt->door->flag_urg != DONT_CARE) {
 				if(attempt->door->flag_urg == SET && !TCP_HAS_FLAG(tcp, urg, TH_URG)) {
-					dprint("packet is not URG, ignoring...\n");
+					dprint("packet is not %s, ignoring...\n", "URG");
 					flagsmatch = 0;
 				}
 				if(attempt->door->flag_urg == NOT_SET && TCP_HAS_FLAG(tcp, urg, TH_URG)) {
-					dprint("packet is not !URG, ignoring...\n");
+					dprint("packet is not %s, ignoring...\n", "!URG");
 					flagsmatch = 0;
 				}
 			}
@@ -1634,61 +1634,61 @@ void sniff(u_char* arg, const struct pcap_pkthdr* hdr, const u_char* packet)
 			if(IP_GET_PROTO(ip) == IPPROTO_TCP){
 				if(door->flag_fin != DONT_CARE) {
 					if(door->flag_fin == SET && !TCP_HAS_FLAG(tcp, fin, TH_FIN)) {
-						dprint("packet is not FIN, ignoring...\n");
+						dprint("packet is not %s, ignoring...\n", "FIN");
 						continue;
 					}
 					if(door->flag_fin == NOT_SET && TCP_HAS_FLAG(tcp, fin, TH_FIN)) {
-						dprint("packet is not !FIN, ignoring...\n");
+						dprint("packet is not %s, ignoring...\n", "!FIN");
 						continue;
 					}
 				}
 				if(door->flag_syn != DONT_CARE) {
 					if(door->flag_syn == SET && !TCP_HAS_FLAG(tcp, syn, TH_SYN)) {
-						dprint("packet is not SYN, ignoring...\n");
+						dprint("packet is not %s, ignoring...\n", "SYN");
 						continue;
 					}
 					if(door->flag_syn == NOT_SET && TCP_HAS_FLAG(tcp, syn, TH_SYN)) {
-						dprint("packet is not !SYN, ignoring...\n");
+						dprint("packet is not %s, ignoring...\n", "!SYN");
 						continue;
 					}
 				}
 				if(door->flag_rst != DONT_CARE) {
 					if(door->flag_rst == SET && !TCP_HAS_FLAG(tcp, rst, TH_RST)) {
-						dprint("packet is not RST, ignoring...\n");#
-							continue;
+						dprint("packet is not %s, ignoring...\n", "RST");
+						continue;
 					}
 					if(door->flag_rst == NOT_SET && TCP_HAS_FLAG(tcp, rst, TH_RST)) {
-						dprint("packet is not !RST, ignoring...\n");
+						dprint("packet is not %s, ignoring...\n", "!RST");
 						continue;
 					}
 				}
 				if(door->flag_psh != DONT_CARE) {
 					if(door->flag_psh == SET && !TCP_HAS_FLAG(tcp, psh, TH_PUSH)) {
-						dprint("packet is not PSH, ignoring...\n");
+						dprint("packet is not %s, ignoring...\n", "PSH");
 						continue;
 					}
 					if(door->flag_psh == NOT_SET && TCP_HAS_FLAG(tcp, psh, TH_PUSH)) {
-						dprint("packet is not !PSH, ignoring...\n");
+						dprint("packet is not %s, ignoring...\n", "!PSH");
 						continue;
 					}
 				}
 				if(door->flag_ack != DONT_CARE) {
 					if(door->flag_ack == SET && !TCP_HAS_FLAG(tcp, ack, TH_ACK)) {
-						dprint("packet is not ACK, ignoring...\n");
+						dprint("packet is not %s, ignoring...\n", "ACK");
 						continue;
 					}
 					if(door->flag_ack == NOT_SET && TCP_HAS_FLAG(tcp, ack, TH_ACK)) {
-						dprint("packet is not !ACK, ignoring...\n");
+						dprint("packet is not %s, ignoring...\n", "!ACK");
 						continue;
 					}
 				}
 				if(door->flag_urg != DONT_CARE) {
 					if(door->flag_urg == SET && !TCP_HAS_FLAG(tcp, urg, TH_URG)) {
-						dprint("packet is not URG, ignoring...\n");
+						dprint("packet is not %s, ignoring...\n", "URG");
 						continue;
 					}
 					if(door->flag_urg == NOT_SET && TCP_HAS_FLAG(tcp, urg, TH_URG)) {
-						dprint("packet is not !URG, ignoring...\n");
+						dprint("packet is not %s, ignoring...\n", "!URG");
 						continue;
 					}
 				}
