@@ -21,6 +21,10 @@
 
 #include "config.h"
 
+#if defined(__FreeBSD__) || defined(__APPLE__)
+#define BSDISH
+#endif
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdarg.h>
@@ -31,11 +35,12 @@
 #include <limits.h>
 #include <string.h>
 #include <fcntl.h>
-#if defined(__FreeBSD__) || defined(__APPLE__)
-#include <limits.h>
+
+#ifdef BSDISH
 #include <sys/socket.h>
 #include <netinet/in_systm.h>
 #endif
+
 #include <netinet/in.h>
 #include <netinet/if_ether.h>
 #include <netinet/ip.h>
@@ -43,19 +48,25 @@
 #include <netinet/udp.h>
 #include <netinet/ip_icmp.h>
 #include <net/if.h>
-#if !defined(__FreeBSD__) && !defined(__APPLE__)
+
+#ifdef BSDISH
 #include <bits/time.h>
 #endif
+
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <sys/ioctl.h>
 #include <arpa/inet.h>
 #include <netdb.h>
+
 #include <getopt.h>
 #include <syslog.h>
-#include <pcap.h>
 #include <errno.h>
+
+#include <pcap.h>
+
 #include "list.h"
+
 
 static char version[] = PACKAGE_VERSION;
 
@@ -149,7 +160,11 @@ int main(int argc, char **argv)
 {
 	char pcapErr[PCAP_ERRBUF_SIZE] = "";
 	int opt, ret, optidx = 1;
-
+        int cap_timeout = 0;
+#ifdef BSDISH
+	cap_timeout = 1;
+#endif
+	
 	static struct option opts[] =
 	{
 		{"verbose",   no_argument,       0, 'v'},
@@ -213,11 +228,7 @@ int main(int argc, char **argv)
 		}
 	}
 
-#if defined(__FreeBSD__) || defined(__APPLE__)
-	cap = pcap_open_live(o_int, 65535, 0, 1, pcapErr);
-#else
-	cap = pcap_open_live(o_int, 65535, 0, 0, pcapErr);
-#endif	
+	cap = pcap_open_live(o_int, 65535, 0, cap_timeout, pcapErr);
 	if(strlen(pcapErr)) {
 		fprintf(stderr, "could not open %s: %s\n", o_int, pcapErr);
 	}
@@ -1115,7 +1126,7 @@ char* get_ip(const char* iface, char *buf, int bufsize)
 	}
 	buf[0] = '\0';
 
-#if defined(__FreeBSD__) || defined(__APPLE__)
+#ifdef BSDISH
 	s = socket(AF_INET, SOCK_DGRAM, 0);
 #else
 	s = socket(PF_PACKET, SOCK_DGRAM, 0);
@@ -1284,7 +1295,7 @@ int exec_cmd(char* command, char* name){
 void sniff(u_char* arg, const struct pcap_pkthdr* hdr, const u_char* packet)
 {
 	/* packet structs */
-#if defined(__FreeBSD__) || defined(__APPLE__)
+#ifdef BSDISH
 	struct ether_header* eth = NULL;
 	struct ip* ip = NULL;
 #else
@@ -1305,9 +1316,9 @@ void sniff(u_char* arg, const struct pcap_pkthdr* hdr, const u_char* packet)
 	char pkt_time[9];
 	PMList *lp;
 	knocker_t *attempt = NULL;
-
+	
+#ifdef BSDISH
 	if(lltype == DLT_EN10MB) {
-#if defined(__FreeBSD__) || defined(__APPLE__)		
 		eth = (struct ether_header*)packet;
 		if(ntohs(eth->ether_type) != ETHERTYPE_IP) {
 			return;
@@ -1319,9 +1330,8 @@ void sniff(u_char* arg, const struct pcap_pkthdr* hdr, const u_char* packet)
 	} else if(lltype == DLT_RAW) {
 		ip = (struct ip*)((u_char*)packet);
 	}
-
-	if(ip->ip_v != 4) {
 #else
+	if(lltype == DLT_EN10MB) {
 		eth = (struct ethhdr*)packet;
 		if(ntohs(eth->h_proto) != ETH_P_IP) {
 			return;
@@ -1333,14 +1343,13 @@ void sniff(u_char* arg, const struct pcap_pkthdr* hdr, const u_char* packet)
 	} else if(lltype == DLT_RAW) {
 		ip = (struct iphdr*)((u_char*)packet);
 	}
-
-	if(ip->version != 4) {
-#endif	
+#endif
+	if(ip->version != 4) {	
 		/* no IPv6 yet */
 		dprint("packet is not IPv4, ignoring...\n");
 		return;
 	}
-#if defined(__FreeBSD__) || defined(__APPLE__)
+#ifdef BSDISH
 	if(ip->ip_p == IPPROTO_ICMP) {
 #else
 	if(ip->protocol == IPPROTO_ICMP) {
@@ -1356,7 +1365,7 @@ void sniff(u_char* arg, const struct pcap_pkthdr* hdr, const u_char* packet)
 		fprintf(stderr, "error: could not understand IP address: %s\n", myip);
 		return;
 	}
-#if defined(__FreeBSD__) || defined(__APPLE__)
+#ifdef BSDISH
 	if(ip->ip_dst.s_addr != inaddr.s_addr) {
 #else
 	if(ip->daddr != inaddr.s_addr) {
@@ -1367,7 +1376,7 @@ void sniff(u_char* arg, const struct pcap_pkthdr* hdr, const u_char* packet)
 	
 	sport = dport = 0;
 
-#if defined(__FreeBSD__) || defined(__APPLE__)
+#ifdef BSDISH
 	if(ip->ip_p == IPPROTO_TCP) {
 		strncpy(proto, "tcp", sizeof(proto));
 		tcp = (struct tcphdr*)((u_char*)ip + (ip->ip_hl *4));
@@ -1402,7 +1411,7 @@ void sniff(u_char* arg, const struct pcap_pkthdr* hdr, const u_char* packet)
 			pkt_tm->tm_sec);
 
 	/* convert IPs from binary to string */
-#if defined(__FreeBSD__) || defined(__APPLE__)	
+#ifdef BSDISH
 	inaddr.s_addr = ip->ip_src.s_addr;
 	strncpy(srcIP, inet_ntoa(inaddr), sizeof(srcIP)-1);
 	srcIP[sizeof(srcIP)-1] = '\0';
@@ -1472,7 +1481,7 @@ void sniff(u_char* arg, const struct pcap_pkthdr* hdr, const u_char* packet)
 		/* if tcp, check the flags to ignore the packets we don't want
 		 * (don't even use it to cancel sequences)
 		 */
-#if defined(__FreeBSD__) || defined(__APPLE__)		 
+#ifdef BSDISH
 		if(ip->ip_p == IPPROTO_TCP) {
 			if(attempt->door->flag_fin != DONT_CARE) {
 				if(attempt->door->flag_fin == SET && !(tcp->th_flags & TH_FIN)) {
@@ -1705,7 +1714,7 @@ void sniff(u_char* arg, const struct pcap_pkthdr* hdr, const u_char* packet)
 		for(lp = doors; lp; lp = lp->next) {
 			opendoor_t *door = (opendoor_t*)lp->data;
 			/* if we're working with TCP, try to match the flags */
-#if defined(__FreeBSD__) || defined(__APPLE__)
+#ifdef BSDISH
 			if(ip->ip_p == IPPROTO_TCP){
 				if(door->flag_fin != DONT_CARE) {
 					if(door->flag_fin == SET && !(tcp->th_flags & TH_FIN)) {dprint("packet is not FIN, ignoring...\n");continue;}
@@ -1775,7 +1784,7 @@ void sniff(u_char* arg, const struct pcap_pkthdr* hdr, const u_char* packet)
 				strcpy(attempt->src, srcIP);
 				/* try a reverse lookup if enabled  */
 				if (o_lookup) {
-#if defined(__FreeBSD__) || defined(__APPLE__)
+#ifdef BSDISH
 					inaddr.s_addr = ip->ip_src.s_addr;
 #else
 					inaddr.s_addr = ip->saddr;
